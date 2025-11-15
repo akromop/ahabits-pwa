@@ -1,307 +1,226 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>A.Habits — Web widget</title>
+  <meta charset="UTF-8" />
+  <title>A.Habits — Web Widget</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Базовые стили "как виджет" -->
   <style>
     :root {
-      --bg1: #1e1e1e;
-      --bg2: #2a2a2a;
+      --bg-top: #1e1e1e;
+      --bg-bottom: #2a2a2a;
+      --accent: #00bfff;
       --text: #ffffff;
       --sub: #888888;
-      --accent: #00bfff;
       --gray-row: #6f6f6f;
     }
+
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
+
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-                   "Helvetica Neue", Arial, sans-serif;
-      background: radial-gradient(circle at top left, var(--bg2), var(--bg1));
-      color: var(--text);
       min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      padding: 16px;
-    }
-    .widget {
-      width: 320px;
-      max-width: 100%;
-      background: linear-gradient(180deg, var(--bg1), var(--bg2));
-      border-radius: 18px;
-      padding: 6px 6px 6px 6px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.6);
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    header {
-      text-align: center;
-      font-size: 10px;
-      color: var(--accent);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+      color: var(--text);
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 4px;
-      margin-top: 2px;
-      margin-bottom: 2px;
     }
-    header .dot {
+
+    .app {
+      width: 100%;
+      max-width: 380px;
+      padding: 8px 10px;
+      border-radius: 18px;
+      background: rgba(0, 0, 0, 0.12);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Header */
+
+    .header {
+      display: flex;
+      justify-content: center;
+      align-items: center;
       font-size: 10px;
+      color: var(--accent);
+      margin-bottom: 4px;
+      text-align: center;
     }
-    main {
+
+    .header-dot {
+      font-size: 10px;
+      color: var(--accent);
+    }
+
+    .header-text {
+      font-weight: 500;
+      padding: 0 4px;
+    }
+
+    /* Body */
+
+    .list {
       display: flex;
       flex-direction: column;
       gap: 2px;
-      padding-inline: 2px;
-      padding-bottom: 2px;
+      margin-top: 2px;
     }
-    .row {
+
+    .habit-row {
       display: flex;
       align-items: center;
       font-size: 12px;
-      min-height: 18px;
+      min-height: 20px;
     }
-    .row-placeholder {
-      color: var(--gray-row);
+
+    .habit-toggle {
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 16px;
+      width: 26px;
+      text-align: left;
+      padding: 0;
+      cursor: pointer;
+      transition: transform 0.08s ease, opacity 0.08s ease;
     }
-    .row-left {
-      flex: 1 1 auto;
-      display: flex;
-      align-items: center;
-      gap: 4px;
+
+    .habit-toggle.not-done {
+      opacity: 0.7;
+    }
+
+    .habit-toggle.done {
+      opacity: 1;
+    }
+
+    .habit-toggle:active {
+      transform: scale(0.9);
+    }
+
+    .habit-main {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .habit-label {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-    .row-right {
-      flex: 0 0 auto;
       font-weight: 600;
-      white-space: nowrap;
-      max-width: 45%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-align: right;
-    }
-    .habit-name {
       color: var(--sub);
-      font-weight: 600;
     }
-    .habit-name.done {
+
+    .habit-label.done {
       color: var(--text);
     }
-    footer {
-      margin-top: 4px;
-      padding: 0 2px 2px 2px;
-      font-size: 8px;
-      color: var(--sub);
+
+    .habit-right {
+      margin-left: 6px;
+      max-width: 55%;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .placeholder {
+      color: var(--gray-row);
+      font-weight: 600;
+    }
+
+    /* Footer */
+
+    .footer {
       display: flex;
       align-items: center;
       justify-content: center;
+      margin-top: 4px;
+      font-size: 8px;
+      color: var(--sub);
       gap: 4px;
+    }
+
+    .footer span {
       white-space: nowrap;
     }
-    footer .strong {
-      font-weight: 700;
-    }
-    .sep {
+
+    .footer-sep {
       opacity: 0.7;
     }
-    .weekly {
-      /* цвет для weekly переопределяем инлайн-стилем */
+
+    .footer-pct {
+      color: var(--accent);
+      font-weight: 700;
     }
-    .error {
-      font-size: 11px;
-      color: #ff9eb5;
+
+    .footer-xp {
+      font-weight: 700;
+    }
+
+    .footer-xp.positive {
+      color: #ffd60a;
+    }
+
+    .footer-sum {
+      font-weight: 700;
+    }
+
+    /* Status */
+
+    .status {
+      margin-top: 4px;
       text-align: center;
-      padding: 4px 0;
+      font-size: 9px;
+      color: var(--sub);
+      min-height: 12px;
+    }
+
+    .status.error {
+      color: #ff9eb5;
+    }
+
+    /* Mobile tweaks */
+
+    @media (max-width: 420px) {
+      .app {
+        max-width: 360px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="widget">
-    <header>
-      <span class="dot">•</span>
-      <span>calm heart · bright mind</span>
-      <span class="dot">•</span>
+  <div class="app">
+    <header class="header">
+      <span class="header-dot">•</span>
+      <span class="header-text">calm heart · bright mind</span>
+      <span class="header-dot">•</span>
     </header>
 
-    <main id="list"></main>
+    <main id="habits-list" class="list">
+      <!-- строки привычек рисуются из script.js -->
+    </main>
 
-    <div id="error" class="error" hidden></div>
+    <div id="status" class="status"></div>
 
-    <footer id="footer"></footer>
+    <footer class="footer">
+      <span id="footer-pct" class="footer-pct">✨ 0%</span>
+      <span class="footer-sep">·</span>
+      <span id="footer-sum" class="footer-sum">Σ 0</span>
+      <span class="footer-sep">·</span>
+      <span id="footer-xp" class="footer-xp">⭐ +0</span>
+      <span class="footer-sep">·</span>
+      <span id="footer-time">00:00</span>
+    </footer>
   </div>
 
-  <script>
-    // === CONFIG ===
-    const API_BASE =
-      "https://script.google.com/macros/s/AKfycbw7kv8ydTrxlgWTaEJhcqa5qoss4TEHh-ElVgQr4xrV38QKPwvCnCdyLHKIbeFIMk0VKw/exec";
-
-    const ICON_SETS = [
-      { not: "⚫️", done: "🟢" },
-      { not: "⚫️", done: "💎" },
-      { not: "⚫️", done: "✨" },
-      { not: "⚫️", done: "🌸" },
-      { not: "⚫️", done: "☀️" },
-    ];
-    const ICON_MODE = "sequence"; // "sequence" | "random"
-
-    function pickIconPair() {
-      if (!ICON_SETS.length) return { not: "⚪", done: "✅" };
-      if (ICON_MODE === "random") {
-        return ICON_SETS[Math.floor(Math.random() * ICON_SETS.length)];
-      }
-      const idx = Math.floor(Date.now() / 86400000) % ICON_SETS.length;
-      return ICON_SETS[idx];
-    }
-
-    function weeklyOrDailyIcon(item, pair) {
-      const t    = String(item.type || "");
-      const done = !!item.doneToday;
-      const due  = !!item.dueToday;
-      if (/^daily/i.test(t))  return done ? pair.done : pair.not;
-      if (/^fixed/i.test(t))  return due ? (done ? pair.done : pair.not) : "➖";
-      if (/^weekly/i.test(t)) return done ? pair.done : pair.not;
-      return "·";
-    }
-
-    async function loadData() {
-      const listEl   = document.getElementById("list");
-      const footerEl = document.getElementById("footer");
-      const errorEl  = document.getElementById("error");
-
-      listEl.innerHTML = "";
-      footerEl.textContent = "";
-      errorEl.hidden = true;
-
-      try {
-        const url = `${API_BASE}?endpoint=widget&ts=${Date.now()}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        renderList(data);
-        renderFooter(data);
-      } catch (err) {
-        console.error(err);
-        errorEl.textContent = "Can't load data. Check GAS URL / CORS.";
-        errorEl.hidden = false;
-        renderPlaceholders();
-      }
-    }
-
-    function renderPlaceholders() {
-      const listEl = document.getElementById("list");
-      listEl.innerHTML = "";
-      for (let i = 0; i < 8; i++) {
-        const row = document.createElement("div");
-        row.className = "row row-placeholder";
-        row.textContent = "  ·";
-        listEl.appendChild(row);
-      }
-    }
-
-    function renderList(data) {
-      const listEl = document.getElementById("list");
-      listEl.innerHTML = "";
-
-      const items = (data && data.items) ? data.items.slice(0, 8) : [];
-      const pair = pickIconPair();
-
-      if (!items.length) {
-        renderPlaceholders();
-        return;
-      }
-
-      for (let i = 0; i < 8; i++) {
-        const row = document.createElement("div");
-        row.className = "row";
-
-        const item = items[i];
-        if (!item) {
-          row.classList.add("row-placeholder");
-          row.textContent = "  ·";
-        } else {
-          const leftWrap = document.createElement("div");
-          leftWrap.className = "row-left";
-
-          const iconSpan = document.createElement("span");
-          iconSpan.textContent = weeklyOrDailyIcon(item, pair);
-
-          const nameSpan = document.createElement("span");
-          nameSpan.className = "habit-name" + (item.doneToday ? " done" : "");
-          nameSpan.textContent = item.habit;
-
-          leftWrap.appendChild(iconSpan);
-          leftWrap.appendChild(nameSpan);
-
-          const right = document.createElement("div");
-          right.className = "row-right";
-          const progStr = String(item.progress || "").trim();
-          right.textContent = progStr;
-
-          if (/^weekly/i.test(item.type || "")) {
-            const col = (item.weeklyColor || "").trim();
-            if (col) right.style.color = col;
-            else     right.style.color = "var(--sub)";
-          } else if (/^fixed/i.test(item.type || "")) {
-            right.style.color = item.doneToday ? "var(--text)" : "var(--sub)";
-          } else {
-            right.style.color = "var(--sub)";
-          }
-
-          row.appendChild(leftWrap);
-          row.appendChild(right);
-        }
-
-        listEl.appendChild(row);
-      }
-    }
-
-    function renderFooter(data) {
-      const footerEl = document.getElementById("footer");
-      footerEl.innerHTML = "";
-
-      const totals = data && data.totals ? data.totals : {};
-      const total  = Number(totals.totalDone || 0);
-      const pct    = Number(totals.weeklyPercent || 0);
-      const xp     = Number(totals.xpWeek || 0);
-
-      const stamp  = data && data.updatedAt ? new Date(data.updatedAt) : new Date();
-      const hh = String(stamp.getHours()).padStart(2, "0");
-      const mm = String(stamp.getMinutes()).padStart(2, "0");
-
-      function add(text, strong) {
-        const span = document.createElement("span");
-        span.textContent = text;
-        if (strong) span.classList.add("strong");
-        footerEl.appendChild(span);
-      }
-      function sep() {
-        const span = document.createElement("span");
-        span.textContent = "•";
-        span.className = "sep";
-        footerEl.appendChild(span);
-      }
-
-      add("✨ " + pct + "%", true);
-      sep();
-      add("Σ " + total, true);
-      sep();
-      add("⭐ " + (xp >= 0 ? "+" + xp : String(xp)), true);
-      sep();
-      add(hh + ":" + mm, false);
-    }
-
-    document.addEventListener("DOMContentLoaded", loadData);
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
