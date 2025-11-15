@@ -1,4 +1,4 @@
-const API_BASE = "PASTE_YOUR_GAS_URL_HERE";  // <-- заменишь потом
+const API_BASE = "https://script.google.com/macros/s/AKfycbw7kv8ydTrxlgWTaEJhcqa5qoss4TEHh-ElVgQr4xrV38QKPwvCnCdyLHKIbeFIMk0VKw/exec";  // <-- заменишь потом
 
 async function loadData() {
     try {
