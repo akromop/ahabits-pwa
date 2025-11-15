@@ -1,291 +1,197 @@
-// ===================== CONFIG =====================
-const API_URL = "https://script.google.com/macros/s/AKfycbw7kv8ydTrxlgWTaEJhcqa5qoss4TEHh-ElVgQr4xrV38QKPwvCnCdyLHKIbeFIMk0VKw/exec";
+// ===== CONFIG =====
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw7kv8ydTrxlgWTaEJhcqa5qoss4TEHh-ElVgQr4xrV38QKPwvCnCdyLHKIbeFIMk0VKw/exec";
 
-// ===================== STATE ======================
-let currentData = null;
-
-// ===================== BOOT =======================
+// ===== BOOTSTRAP =====
 document.addEventListener("DOMContentLoaded", () => {
-  const app = document.getElementById("app");
-  if (!app) {
-    alert("Error: #app container not found in HTML");
-    return;
+  try {
+    const app = document.getElementById("app");
+    if (!app) {
+      alert("Error: #app container not found in HTML");
+      return;
+    }
+    initApp(app);
+  } catch (e) {
+    alert("Error initializing app:\n" + (e.message || e));
   }
-  loadAndRender();
 });
 
-// ===================== LOAD + RENDER ==============
-async function loadAndRender() {
-  const app = document.getElementById("app");
-  app.innerHTML = "Loading…";
-
+async function initApp(app) {
+  app.innerHTML = "<div class='ah-loading'>Loading…</div>";
   try {
-    const url = `${API_URL}?endpoint=widget&ts=${Date.now()}`;
-    const res = await fetch(url, { method: "GET" });
-
-    if (!res.ok) {
-      const text = await safeReadText_(res);
-      throw new Error(`HTTP ${res.status} ${res.statusText} — ${text}`);
-    }
-
-    const raw = await res.text();
-
-    if (raw.trim().startsWith("<")) {
-      throw new Error("GAS returned HTML instead of JSON (auth / access issue)");
-    }
-
-    let json;
-    try {
-      json = JSON.parse(raw);
-    } catch (e) {
-      throw new Error("JSON parse error: " + e.message + " | raw: " + raw.slice(0, 200));
-    }
-
-    currentData = json;
-    renderApp_(json);
-  } catch (err) {
-    console.error(err);
-    alert("Error loading data:\n" + String(err.message || err));
-    const app2 = document.getElementById("app");
-    app2.innerHTML = "<div style='color:#ff8888;font-size:14px;'>Error loading data</div>";
+    const data = await loadData();
+    renderApp(app, data);
+  } catch (e) {
+    app.innerHTML = "<div class='ah-error'>Error loading data</div>";
+    alert("Error loading:\n" + (e.message || "Load failed"));
   }
 }
 
-function renderApp_(data) {
-  const app = document.getElementById("app");
+// ===== API =====
+async function loadData() {
+  const url = `${SCRIPT_URL}?endpoint=widget&ts=${Date.now()}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "Bad JSON");
+  return json;
+}
+
+async function toggleHabitRemote(habit, currentDone) {
+  const desired = !currentDone;
+  const body = new URLSearchParams();
+  body.set("endpoint", "toggle");
+  body.set("habit", habit);
+  body.set("done", desired ? "1" : "0");
+
+  const res = await fetch(SCRIPT_URL, {
+    method: "POST",
+    body
+    // без headers → нет CORS preflight, Apps Script спокойно принимает
+  });
+
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "Save failed");
+
+  return desired;
+}
+
+// ===== RENDER =====
+function renderApp(app, data) {
   app.innerHTML = "";
 
-  const items = Array.isArray(data.items) ? data.items : [];
-  const totals = data.totals || {};
+  const container = document.createElement("div");
+  container.className = "ah-widget";
 
-  // ==== HEADER (как виджет) ====
+  // header
   const header = document.createElement("div");
-  header.style.textAlign = "center";
-  header.style.marginBottom = "4px";
-  header.style.fontSize = "10px";
-  header.style.color = "#00BFFF";
+  header.className = "ah-header";
+  header.textContent = "• calm heart · bright mind •";
+  container.appendChild(header);
 
-  const dotLeft = document.createElement("span");
-  dotLeft.textContent = "• ";
-  const titleSpan = document.createElement("span");
-  titleSpan.textContent = "calm heart · bright mind";
-  const dotRight = document.createElement("span");
-  dotRight.textContent = " •";
+  // body
+  const body = document.createElement("div");
+  body.className = "ah-body";
 
-  header.appendChild(dotLeft);
-  header.appendChild(titleSpan);
-  header.appendChild(dotRight);
-  app.appendChild(header);
-
-  // ==== BODY (строки привычек) ====
-  const list = document.createElement("div");
-  app.appendChild(list);
-
-  const maxRows = 8;
-  for (let i = 0; i < maxRows; i++) {
-    const it = items[i];
-
+  const items = Array.isArray(data.items) ? data.items.slice(0, 8) : [];
+  items.forEach(item => {
+    body.appendChild(makeRow(item));
+  });
+  // заполняем до 8 строк точками
+  for (let i = items.length; i < 8; i++) {
     const row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.justifyContent = "space-between";
-    row.style.fontSize = "12px";
-    row.style.color = "#ffffff";
-    row.style.marginBottom = i < maxRows - 1 ? "2px" : "0";
-
-    if (!it) {
-      const placeholder = document.createElement("div");
-      placeholder.textContent = "  ·";
-      placeholder.style.color = "#6f6f6f";
-      row.appendChild(placeholder);
-      list.appendChild(row);
-      continue;
-    }
-
-    const type = String(it.type || "");
-    const doneToday = !!it.doneToday;
-    const dueToday = !!it.dueToday;
-    const progress = String(it.progress || "");
-    const weeklyColor = String(it.weeklyColor || "");
-
-    // ===== Left: icon button + habit name =====
-    const leftWrap = document.createElement("div");
-    leftWrap.style.display = "flex";
-    leftWrap.style.alignItems = "center";
-    leftWrap.style.flex = "1 1 auto";
-    leftWrap.style.minWidth = "0"; // чтобы текст мог сжиматься
-
-    const iconBtn = document.createElement("button");
-    iconBtn.type = "button";
-    iconBtn.style.border = "none";
-    iconBtn.style.margin = "0";
-    iconBtn.style.padding = "0 4px 0 0";
-    iconBtn.style.background = "transparent";
-    iconBtn.style.fontSize = "14px";
-    iconBtn.style.cursor = "pointer";
-
-    const iconChar = getIconFor_(type, doneToday, dueToday);
-    iconBtn.textContent = iconChar;
-
-    const nameSpan = document.createElement("span");
-    nameSpan.textContent = it.habit;
-    nameSpan.style.whiteSpace = "nowrap";
-    nameSpan.style.overflow = "hidden";
-    nameSpan.style.textOverflow = "ellipsis";
-    nameSpan.style.color = doneToday ? "#ffffff" : "#888888";
-
-    leftWrap.appendChild(iconBtn);
-    leftWrap.appendChild(nameSpan);
-
-    // ===== Right: progress =====
-    const rightSpan = document.createElement("span");
-    rightSpan.textContent = progress;
-    rightSpan.style.fontSize = "12px";
-    rightSpan.style.marginLeft = "6px";
-    rightSpan.style.whiteSpace = "nowrap";
-
-    if (/^weekly/i.test(type)) {
-      rightSpan.style.color = weeklyColor ? weeklyColor : "#888888";
-    } else if (/^fixed/i.test(type)) {
-      rightSpan.style.color = doneToday ? "#ffffff" : "#888888";
-    } else {
-      rightSpan.style.color = "#888888";
-    }
-
-    row.appendChild(leftWrap);
-    row.appendChild(rightSpan);
-    list.appendChild(row);
-
-    // ===== CLICK HANDLER (по иконке слева) =====
-    iconBtn.addEventListener("click", async () => {
-      await onToggleClick_(it, iconBtn, nameSpan, rightSpan);
-    });
+    row.className = "ah-row ah-row-empty";
+    row.textContent = "·";
+    body.appendChild(row);
   }
 
-  // ==== FOOTER ====
+  container.appendChild(body);
+
+  // footer
   const footer = document.createElement("div");
-  footer.style.display = "flex";
-  footer.style.alignItems = "center";
-  footer.style.justifyContent = "center";
-  footer.style.marginTop = "4px";
-  footer.style.fontSize = "8px";
-  footer.style.color = "#888888";
+  footer.className = "ah-footer";
 
-  const totalDone = Number(totals.totalDone || 0);
-  const weeklyPercent = Number(totals.weeklyPercent || 0);
-  const xpWeek = Number(totals.xpWeek || 0);
+  const total = Number(data?.totals?.totalDone ?? 0);
+  const pct   = Number(data?.totals?.weeklyPercent ?? 0);
+  const xp    = Number(data?.totals?.xpWeek ?? 0);
 
-  footer.appendChild(makeFooterChunk_("✨ " + weeklyPercent + "%"));
-  footer.appendChild(makeFooterSep_());
-  footer.appendChild(makeFooterChunk_("Σ " + totalDone));
-  footer.appendChild(makeFooterSep_());
-  footer.appendChild(
-    makeFooterChunk_("⭐ " + (xpWeek >= 0 ? "+" + xpWeek : String(xpWeek)))
-  );
-  footer.appendChild(makeFooterSep_());
+  footer.appendChild(makeFooterChip(`✨ ${pct}%`));
+  footer.appendChild(makeFooterSep());
+  footer.appendChild(makeFooterChip(`Σ ${total}`));
+  footer.appendChild(makeFooterSep());
+  footer.appendChild(makeFooterChip(`⭐ ${xp >= 0 ? "+" + xp : String(xp)}`));
 
-  const stamp = data.updatedAt ? new Date(data.updatedAt) : new Date();
+  footer.appendChild(makeFooterSep());
+  const stamp = data?.updatedAt ? new Date(data.updatedAt) : new Date();
   const hh = String(stamp.getHours()).padStart(2, "0");
   const mm = String(stamp.getMinutes()).padStart(2, "0");
-  footer.appendChild(makeFooterChunk_(hh + ":" + mm));
+  footer.appendChild(makeFooterChip(`${hh}:${mm}`));
 
-  app.appendChild(footer);
+  container.appendChild(footer);
+
+  app.appendChild(container);
+
+  // подвешиваем обработчики
+  wireRowHandlers(body, items);
 }
 
-// ===================== TOGGLE LOGIC ==================
-async function onToggleClick_(item, iconBtn, nameSpan, rightSpan) {
-  const habit = item.habit;
-  const currentDone = !!item.doneToday;
-  const desired = !currentDone;
+function makeRow(item) {
+  const row = document.createElement("div");
+  row.className = "ah-row";
 
-  // Оптимистично меняем иконку/цвет (но можем откатить при ошибке)
-  const prevIcon = iconBtn.textContent;
-  const prevNameColor = nameSpan.style.color;
+  const leftBtn = document.createElement("button");
+  leftBtn.className = "ah-dot";
+  leftBtn.type = "button";
+  leftBtn.textContent = item.doneToday ? "🟢" : "⚫️";
 
-  iconBtn.textContent = getIconFor_(item.type, desired, item.dueToday);
-  nameSpan.style.color = desired ? "#ffffff" : "#888888";
+  const title = document.createElement("div");
+  title.className = "ah-title";
+  title.textContent = item.habit;
 
-  try {
-    const url = `${API_URL}?endpoint=checkin&ts=${Date.now()}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ habit, done: desired })
+  const right = document.createElement("div");
+  right.className = "ah-progress";
+  right.textContent = item.progress || "";
+
+  // цвет прогресса для weekly
+  const type = String(item.type || "");
+  if (/^weekly/i.test(type)) {
+    const col = (item.weeklyColor || "").trim();
+    if (col) right.style.color = col;
+  } else if (/^fixed/i.test(type)) {
+    right.style.color = item.doneToday ? "#ffffff" : "#888888";
+  } else {
+    right.style.color = "#888888";
+  }
+
+  row.appendChild(leftBtn);
+  row.appendChild(title);
+  row.appendChild(right);
+
+  // сохраняем мету
+  row.dataset.habit = item.habit;
+  row.dataset.done = item.doneToday ? "1" : "0";
+
+  return row;
+}
+
+function wireRowHandlers(bodyEl, items) {
+  const rows = Array.from(bodyEl.querySelectorAll(".ah-row"));
+  rows.forEach(row => {
+    const habit = row.dataset.habit;
+    if (!habit) return;
+
+    const btn = row.querySelector(".ah-dot");
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+      const currentDone = row.dataset.done === "1";
+      try {
+        btn.disabled = true;
+        const newDone = await toggleHabitRemote(habit, currentDone);
+        // Обновим весь виджет, чтобы всё пересчиталось
+        const app = document.getElementById("app");
+        if (!app) return;
+        const data = await loadData();
+        renderApp(app, data);
+      } catch (e) {
+        alert("Error saving:\n" + (e.message || "Load failed"));
+      } finally {
+        btn.disabled = false;
+      }
     });
-
-    if (!res.ok) {
-      const text = await safeReadText_(res);
-      throw new Error(`HTTP ${res.status} ${res.statusText} — ${text}`);
-    }
-
-    let raw;
-    try {
-      raw = await res.text();
-    } catch (e) {
-      throw new Error("Failed to read response: " + e.message);
-    }
-
-    if (!raw) {
-      throw new Error("Empty response from server");
-    }
-
-    let json;
-    try {
-      json = JSON.parse(raw);
-    } catch (e) {
-      throw new Error("JSON parse error on save: " + e.message + " | raw: " + raw.slice(0, 200));
-    }
-
-    if (!json.ok) {
-      throw new Error(json.error || "Server returned ok:false");
-    }
-
-    // Успех → перезагружаем данные, чтобы прогрессы/цвета подтянулись из таблицы
-    await loadAndRender();
-  } catch (err) {
-    console.error(err);
-    // Откат визуала
-    iconBtn.textContent = prevIcon;
-    nameSpan.style.color = prevNameColor;
-    alert("Error saving:\n" + String(err.message || err));
-  }
+  });
 }
 
-// ===================== HELPERS ======================
-function getIconFor_(typeRaw, done, dueToday) {
-  const t = String(typeRaw || "");
-  if (/^daily/i.test(t)) {
-    return done ? "🟢" : "⚫️";
-  }
-  if (/^fixed/i.test(t)) {
-    if (!dueToday) return "➖";
-    return done ? "🟢" : "⚫️";
-  }
-  if (/^weekly/i.test(t)) {
-    return done ? "🟢" : "⚫️";
-  }
-  return "·";
-}
-
-function makeFooterChunk_(text) {
+// footer helpers
+function makeFooterChip(text) {
   const span = document.createElement("span");
+  span.className = "ah-footer-chip";
   span.textContent = text;
   return span;
 }
-
-function makeFooterSep_() {
+function makeFooterSep() {
   const span = document.createElement("span");
+  span.className = "ah-footer-sep";
   span.textContent = " • ";
-  span.style.margin = "0 2px";
   return span;
-}
-
-async function safeReadText_(res) {
-  try {
-    return await res.text();
-  } catch {
-    return "";
-  }
 }
